@@ -16253,6 +16253,119 @@ async onCellClicked(record,column,ev){if(!this.isEditable){return;}
 return await super.onCellClicked(record,column,ev);}}
 CommonSkillsListRenderer.rowsTemplate="hr_skills.SkillsListRenderer.Rows";return __exports;});;
 
+/* /iap/static/src/action_buttons_widget/action_buttons_widget.js */
+odoo.define('@iap/action_buttons_widget/action_buttons_widget',['@web/core/registry','@web/core/utils/hooks','@web/views/widgets/standard_widget_props','@odoo/owl'],function(require){'use strict';let __exports={};const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{standardWidgetProps}=require("@web/views/widgets/standard_widget_props");const{Component}=require("@odoo/owl");class IAPActionButtonsWidget extends Component{setup(){this.orm=useService("orm");this.action=useService("action");}
+async onViewServicesClicked(){this.action.doAction("iap.iap_account_action");}
+async onBuyLinkClicked(){const url=await this.orm.silent.call("iap.account","get_credits_url",[this.props.serviceName]);this.action.doAction({type:"ir.actions.act_url",url:url,});}}
+IAPActionButtonsWidget.template="iap.ActionButtonsWidget";IAPActionButtonsWidget.props={...standardWidgetProps,serviceName:String,showServiceButtons:Boolean,};const iapActionButtonsWidget=__exports.iapActionButtonsWidget={component:IAPActionButtonsWidget,extractProps:({attrs})=>{return{serviceName:attrs.service_name,showServiceButtons:!Boolean(attrs.hide_service),};},};registry.category("view_widgets").add("iap_buy_more_credits",iapActionButtonsWidget);return __exports;});;
+
+/* /iap/static/src/js/insufficient_credit_error_handler.js */
+odoo.define('@iap/js/insufficient_credit_error_handler',['@web/core/dialog/dialog','@web/core/registry','@web/core/utils/hooks','@web/core/l10n/translation','@odoo/owl'],function(require){'use strict';let __exports={};const{Dialog}=require("@web/core/dialog/dialog");const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{_t}=require("@web/core/l10n/translation");const{Component,onWillStart}=require("@odoo/owl");class InsufficientCreditDialog extends Component{setup(){this.orm=useService("orm");onWillStart(this.onWillStart);}
+async onWillStart(){const{errorData}=this.props;this.url=await this.orm.call("iap.account","get_credits_url",[],{base_url:errorData.base_url,service_name:errorData.service_name,credit:errorData.credit,trial:errorData.trial,});this.style=errorData.body?"padding:0;":"";const{isEnterprise}=odoo.info;if(errorData.trial&&isEnterprise){this.buttonMessage=_t("Start a Trial at Odoo");}else{this.buttonMessage=_t("Buy credits");}}
+buyCredits(){window.open(this.url,"_blank");this.props.close();}}
+InsufficientCreditDialog.components={Dialog};InsufficientCreditDialog.template="iap.InsufficientCreditDialog";function insufficientCreditHandler(env,error,originalError){if(!originalError){return false;}
+const{data}=originalError;if(data&&data.name==="odoo.addons.iap.tools.iap_tools.InsufficientCreditError"){env.services.dialog.add(InsufficientCreditDialog,{errorData:JSON.parse(data.message),});return true;}
+return false;}
+registry.category("error_handlers").add("insufficientCreditHandler",insufficientCreditHandler,{sequence:0});return __exports;});;
+
+/* /iap_mail/static/src/js/services/iap_notification_service.js */
+odoo.define('@iap_mail/js/services/iap_notification_service',['@web/core/l10n/translation','@web/core/registry','@odoo/owl'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{registry}=require("@web/core/registry");const{markup}=require("@odoo/owl");const iapNotificationService=__exports.iapNotificationService={dependencies:["bus_service","notification"],start(env,{bus_service,notification}){bus_service.subscribe("iap_notification",(params)=>{if(params.type=="no_credit"){displayCreditErrorNotification(params);}else{displayNotification(params);}});bus_service.start();function displayNotification(params){notification.add(params.message,{title:params.title,type:params.type,});}
+function displayCreditErrorNotification(params){const translatedText=_t("Buy more credits");const message=markup(`
+            <a class='btn btn-link' href='${params.get_credits_url}' target='_blank'>
+                <i class='oi oi-arrow-right'></i>
+                ${translatedText}
+            </a>`);notification.add(message,{title:params.title,type:'danger',});}}};registry.category("services").add("iapNotification",iapNotificationService);return __exports;});;
+
+/* /sms/static/src/components/phone_field/phone_field.js */
+odoo.define('@sms/components/phone_field/phone_field',['@web/core/l10n/translation','@web/core/utils/patch','@web/views/fields/phone/phone_field','@sms/components/sms_button/sms_button'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");const{PhoneField,phoneField,formPhoneField}=require("@web/views/fields/phone/phone_field");const{SendSMSButton}=require('@sms/components/sms_button/sms_button');patch(PhoneField,{components:{...PhoneField.components,SendSMSButton},defaultProps:{...PhoneField.defaultProps,enableButton:true,},props:{...PhoneField.props,enableButton:{type:Boolean,optional:true},},});const patchDescr=()=>({extractProps({options}){const props=super.extractProps(...arguments);props.enableButton=options.enable_sms;return props;},supportedOptions:[{label:_t("Enable SMS"),name:"enable_sms",type:"boolean",default:true,}],});patch(phoneField,patchDescr());patch(formPhoneField,patchDescr());return __exports;});;
+
+/* /sms/static/src/components/sms_button/sms_button.js */
+odoo.define('@sms/components/sms_button/sms_button',['@web/core/l10n/translation','@web/core/utils/hooks','@odoo/owl'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{useService}=require("@web/core/utils/hooks");const{Component,status}=require("@odoo/owl");const SendSMSButton=__exports.SendSMSButton=class SendSMSButton extends Component{setup(){this.action=useService("action");this.user=useService("user");this.title=_t("Send SMS Text Message");}
+get phoneHref(){return"sms:"+this.props.record.data[this.props.name].replace(/\s+/g,"");}
+async onClick(){await this.props.record.save();this.action.doAction({type:"ir.actions.act_window",target:"new",name:this.title,res_model:"sms.composer",views:[[false,"form"]],context:{...this.user.context,default_res_model:this.props.record.resModel,default_res_id:this.props.record.resId,default_number_field_name:this.props.name,default_composition_mode:"comment",},},{onClose:()=>{if(status(this)==="destroyed"){return;}
+this.props.record.load();},});}}
+SendSMSButton.template="sms.SendSMSButton";SendSMSButton.props=["*"];return __exports;});;
+
+/* /sms/static/src/components/sms_widget/fields_sms_widget.js */
+odoo.define('@sms/components/sms_widget/fields_sms_widget',['@web/core/l10n/translation','@mail/views/web/fields/emojis_text_field/emojis_text_field','@web/core/utils/hooks','@web/core/registry'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{EmojisTextField,emojisTextField,}=require("@mail/views/web/fields/emojis_text_field/emojis_text_field");const{useService}=require("@web/core/utils/hooks");const{registry}=require("@web/core/registry");const SmsWidget=__exports.SmsWidget=class SmsWidget extends EmojisTextField{setup(){super.setup();this._emojiAdded=()=>this.props.record.update({[this.props.name]:this.targetEditElement.el.value});this.notification=useService('notification');}
+get encoding(){return this._extractEncoding(this.props.record.data[this.props.name]||'');}
+get nbrChar(){const content=this._getValueForSmsCounts(this.props.record.data[this.props.name]||"");return content.length+(content.match(/\n/g)||[]).length;}
+get nbrCharExplanation(){return"";}
+get nbrSMS(){return this._countSMS(this.nbrChar,this.encoding);}
+_countSMS(nbrChar,encoding){if(nbrChar===0){return 0;}
+if(encoding==='UNICODE'){if(nbrChar<=70){return 1;}
+return Math.ceil(nbrChar/67);}
+if(nbrChar<=160){return 1;}
+return Math.ceil(nbrChar/153);}
+_extractEncoding(content){if(String(content).match(RegExp("^[@£$¥èéùìòÇ\\nØø\\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\\\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà]*$"))){return'GSM7';}
+return'UNICODE';}
+_getValueForSmsCounts(value){return value;}
+async onBlur(){var content=this.props.record.data[this.props.name]||'';if(!content.trim().length&&content.length>0){this.notification.add(_t("Your SMS Text Message must include at least one non-whitespace character"),{type:'danger'},)
+await this.props.record.update({[this.props.name]:content.trim()});}}
+async onInput(ev){super.onInput(...arguments);await this.props.record.update({[this.props.name]:this.targetEditElement.el.value});}}
+SmsWidget.template='sms.SmsWidget';const smsWidget=__exports.smsWidget={...emojisTextField,component:SmsWidget,additionalClasses:[...(emojisTextField.additionalClasses||[]),"o_field_text","o_field_text_emojis",],};registry.category("fields").add("sms_widget",smsWidget);return __exports;});;
+
+/* /sms/static/src/core/failure_model_patch.js */
+odoo.define('@sms/core/failure_model_patch',['@mail/core/common/failure_model','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Failure}=require("@mail/core/common/failure_model");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(Failure.prototype,{get iconSrc(){if(this.type==="sms"){return"/sms/static/img/sms_failure.svg";}
+return super.iconSrc;},get body(){if(this.type==="sms"){return _t("An error occurred when sending an SMS");}
+return super.body;},});return __exports;});;
+
+/* /sms/static/src/core/notification_model_patch.js */
+odoo.define('@sms/core/notification_model_patch',['@mail/core/common/notification_model','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Notification}=require("@mail/core/common/notification_model");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(Notification.prototype,{get icon(){if(this.notification_type==="sms"){return"fa fa-mobile";}
+return super.icon;},get label(){if(this.notification_type==="sms"){return _t("SMS");}
+return super.label;},});return __exports;});;
+
+/* /sms/static/src/messaging_menu/messaging_menu_patch.js */
+odoo.define('@sms/messaging_menu/messaging_menu_patch',['@mail/core/web/messaging_menu','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{MessagingMenu}=require("@mail/core/web/messaging_menu");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(MessagingMenu.prototype,{openFailureView(failure){if(failure.type==="email"){return super.openFailureView(failure);}
+this.env.services.action.doAction({name:_t("SMS Failures"),type:"ir.actions.act_window",view_mode:"kanban,list,form",views:[[false,"kanban"],[false,"list"],[false,"form"],],target:"current",res_model:failure.resModel,domain:[["message_has_sms_error","=",true]],context:{create:false},});this.close();},});return __exports;});;
+
+/* /sms/static/src/thread/message_patch.js */
+odoo.define('@sms/thread/message_patch',['@mail/core/common/message','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Message}=require("@mail/core/common/message");const{patch}=require("@web/core/utils/patch");patch(Message.prototype,{onClickFailure(){if(this.message.type==="sms"){this.env.services.action.doAction("sms.sms_resend_action",{additionalContext:{default_mail_message_id:this.message.id,},});}else{super.onClickFailure(...arguments);}},});return __exports;});;
+
+/* /base_automation/static/src/base_automation_actions_one2many_field.js */
+odoo.define('@base_automation/base_automation_actions_one2many_field',['@odoo/owl','@web/core/l10n/translation','@web/core/registry','@web/core/utils/timing'],function(require){'use strict';let __exports={};const{Component,useExternalListener,useEffect,useRef}=require("@odoo/owl");const{_lt,_t}=require("@web/core/l10n/translation");const{registry}=require("@web/core/registry");const{useThrottleForAnimation}=require("@web/core/utils/timing");class ActionsOne2ManyField extends Component{static props=["*"];static template="base_automation.ActionsOne2ManyField";static actionStates={code:_lt("Execute Python Code"),object_create:_lt("Create a new Record"),object_write:_lt("Update the Record"),multi:_lt("Execute several actions"),mail_post:_lt("Send email"),followers:_lt("Add followers"),remove_followers:_lt("Remove followers"),next_activity:_lt("Create next activity"),sms:_lt("Send SMS Text Message"),};setup(){this.root=useRef("root");let adaptCounter=0;useEffect(()=>{this.adapt();},()=>[adaptCounter]);const throttledRenderAndAdapt=useThrottleForAnimation(()=>{adaptCounter++;this.render();});useExternalListener(window,"resize",throttledRenderAndAdapt);this.currentActions=this.props.record.data[this.props.name].records;this.hiddenActionsCount=0;}
+async adapt(){const rootWidth=this.root.el.getBoundingClientRect().width;const actionsEls=Array.from(this.root.el.children).filter((el)=>el.dataset.actionId);actionsEls.forEach((el)=>el.classList.remove("d-none"));const actionsTotalWidth=actionsEls.reduce((sum,el)=>sum+el.getBoundingClientRect().width,0);let overflowingActionId;if(actionsTotalWidth>rootWidth){let width=56;for(const el of actionsEls){const elWidth=el.getBoundingClientRect().width;if(width+elWidth>rootWidth){overflowingActionId=el.dataset.actionId;const firstOverflowingEl=actionsEls.find((el)=>el.dataset.actionId===overflowingActionId);const firstOverflowingIndex=actionsEls.indexOf(firstOverflowingEl);const overflowingEls=actionsEls.slice(firstOverflowingIndex);overflowingEls.forEach((el)=>el.classList.add("d-none"));break;}
+width+=elWidth;}}
+const initialHiddenActionsCount=this.hiddenActionsCount;this.hiddenActionsCount=overflowingActionId?this.currentActions.length-
+this.currentActions.findIndex((action)=>action.id===overflowingActionId):0;if(initialHiddenActionsCount!==this.hiddenActionsCount){return this.render();}}
+getActionType(action){return this.constructor.actionStates[action.data.state]||action.data.state;}
+get moreText(){const isPlural=this.hiddenActionsCount>1;return isPlural?_t("%s actions",this.hiddenActionsCount):_t("1 action");}}
+const actionsOne2ManyField={component:ActionsOne2ManyField,relatedFields:[{name:"name",type:"char"},{name:"state",type:"selection",selection:[["code",_lt("Execute Python Code")],["object_create",_lt("Create a new Record")],["object_write",_lt("Update the Record")],["multi",_lt("Execute several actions")],["mail_post",_lt("Send email")],["followers",_lt("Add followers")],["remove_followers",_lt("Remove followers")],["next_activity",_lt("Create next activity")],["sms",_lt("Send SMS Text Message")],],},{name:"code",type:"text"},{name:"crud_model_id",type:"many2one"},{name:"crud_model_name",type:"char"},{name:"partner_ids",type:"many2many"},{name:"template_id",type:"many2one"},{name:"mail_post_autofollow",type:"boolean"},{name:"mail_post_method",type:"selection",selection:[["email",_lt("Email")],["comment",_lt("Post as Message")],["note",_lt("Post as Note")],],},{name:"activity_type_id",type:"many2one"},{name:"activity_summary",type:"char"},{name:"activity_note",type:"html"},{name:"activity_date_deadline_range",type:"integer"},{name:"activity_date_deadline_range_type",type:"selection",selection:[["days",_lt("Days")],["weeks",_lt("Weeks")],["months",_lt("Months")],],},{name:"activity_user_type",type:"selection",selection:[["specific",_lt("Specific User")],["generic",_lt("Generic User")],],},{name:"activity_user_id",type:"many2one"},{name:"activity_user_field_name",type:"char"},],};registry.category("fields").add("base_automation_actions_one2many",actionsOne2ManyField);return __exports;});;
+
+/* /base_automation/static/src/base_automation_error_dialog.js */
+odoo.define('@base_automation/base_automation_error_dialog',['@web/core/errors/error_dialogs','@web/core/registry','@web/core/utils/hooks'],function(require){'use strict';let __exports={};const{RPCErrorDialog}=require("@web/core/errors/error_dialogs");const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const BaseAutomationErrorDialog=__exports.BaseAutomationErrorDialog=class BaseAutomationErrorDialog extends RPCErrorDialog{setup(){super.setup(...arguments);const{id,name}=this.props.data.context.base_automation;this.automationId=id;this.automationName=name;this.isUserAdmin=useService("user").isAdmin;this.actionService=useService("action");this.orm=useService("orm");}
+async disableAutomation(ev){await this.orm.write("base.automation",[this.automationId],{active:false});this.props.close();}
+editAutomation(ev){this.actionService.doAction({name:"Automation Rules",res_model:"base.automation",res_id:this.automationId,views:[[false,"form"]],type:"ir.actions.act_window",view_mode:"form",target:"new",});this.props.close();}}
+BaseAutomationErrorDialog.template="base_automation.ErrorDialog";registry.category("error_dialogs").add("base_automation",BaseAutomationErrorDialog);return __exports;});;
+
+/* /base_automation/static/src/base_automation_trigger_reference_field.js */
+odoo.define('@base_automation/base_automation_trigger_reference_field',['@odoo/owl','@web/core/registry','@web/views/fields/many2one/many2one_field'],function(require){'use strict';let __exports={};const{Component,xml}=require("@odoo/owl");const{registry}=require("@web/core/registry");const{Many2OneField,many2OneField}=require("@web/views/fields/many2one/many2one_field");const TriggerReferenceField=__exports.TriggerReferenceField=class TriggerReferenceField extends Component{static components={Many2OneField};static props={...Many2OneField.props};static template=xml`<Many2OneField t-props="m2oProps" />`;get m2oProps(){return{...this.props,relation:this.m2oRelation,value:this.m2oValue,update:this.updateM2O.bind(this),canCreate:false,canCreateEdit:false,canOpen:false,canQuickCreate:false,};}
+get m2oRelation(){return this.props.record.data.trg_field_ref_model_name;}
+get m2oValue(){if(!this.value){return null;}
+const displayName=this.props.record.data.trg_field_ref_display_name;return[this.value,displayName];}
+get value(){return this.props.record.data[this.props.name];}
+updateM2O(data){const value=data[this.props.name];const resId=value&&value[0];this.props.record.update({[this.props.name]:resId});}}
+const triggerReferenceField=__exports.triggerReferenceField={supportedTypes:["char"],component:TriggerReferenceField,supportedOptions:many2OneField.supportedOptions,extractProps:many2OneField.extractProps,};registry.category("fields").add("base_automation_trigger_reference",triggerReferenceField);return __exports;});;
+
+/* /base_automation/static/src/base_automation_trigger_selection_field.js */
+odoo.define('@base_automation/base_automation_trigger_selection_field',['@odoo/owl','@web/core/l10n/translation','@web/core/registry','@web/model/relational_model/utils','@web/views/fields/selection/selection_field','@base_automation/utils','@web/core/utils/hooks'],function(require){'use strict';let __exports={};const{useState}=require("@odoo/owl");const{_lt,_t}=require("@web/core/l10n/translation");const{registry}=require("@web/core/registry");const{useRecordObserver}=require("@web/model/relational_model/utils");const{selectionField,SelectionField}=require("@web/views/fields/selection/selection_field");const{TRIGGER_FILTERS}=require("@base_automation/utils");const{useService}=require("@web/core/utils/hooks");const OPT_GROUPS=[{group:{sequence:10,key:"values",name:_lt("Values Updated")},triggers:["on_stage_set","on_user_set","on_tag_set","on_state_set","on_priority_set","on_archive","on_unarchive",],},{group:{sequence:30,key:"timing",name:_lt("Timing Conditions")},triggers:["on_time","on_time_created","on_time_updated"],},{group:{sequence:40,key:"custom",name:_lt("Custom")},triggers:["on_create_or_write","on_unlink","on_change"],},{group:{sequence:50,key:"external",name:_lt("External")},triggers:["on_webhook"],},{group:{sequence:20,key:"mail",name:_t("Email Events")},triggers:["on_message_sent","on_message_received"],},{group:{sequence:60,key:"deprecated",name:_lt("Deprecated (do not use)")},triggers:["on_create","on_write"],},];function computeDerivedOptions(options,fields,currentSelection,{excludeGroups=[]}={}){const derivedOptions=[];for(const[value,label]of options){const{group,triggers}=OPT_GROUPS.find((g)=>g.triggers.includes(value));if((group.key==="deprecated"&&!triggers.includes(currentSelection))||excludeGroups.includes(group.key)){continue;}
+const filterFn=TRIGGER_FILTERS[value];if(filterFn){const triggerFields=fields.filter(filterFn);if(triggerFields.length===0){continue;}}
+const option={group,value,label};derivedOptions.push(option);}
+return derivedOptions;}
+const TriggerSelectionField=__exports.TriggerSelectionField=class TriggerSelectionField extends SelectionField{static template="base_automation.TriggerSelectionField";setup(){super.setup();this.groupedOptions=useState([]);const orm=useService("orm");let lastRelatedModelId;let relatedModelFields;useRecordObserver(async(record)=>{const{data,fields}=record;const modelId=data.model_id?.[0];if(lastRelatedModelId!==modelId){lastRelatedModelId=modelId;relatedModelFields=await orm.searchRead("ir.model.fields",[["model_id","=",modelId]],["field_description","name","ttype","relation"]);}
+const derivedOptions=computeDerivedOptions(fields[this.props.name].selection,relatedModelFields,data[this.props.name],{excludeGroups:data.model_is_mail_thread?[]:["mail"]});this.groupedOptions.length=0;for(const option of derivedOptions){const group=this.groupedOptions.find((g)=>g.key===option.group.key)??{...option.group,options:[],};group.options.push(option);if(!this.groupedOptions.includes(group)){this.groupedOptions.push(group);}}
+this.groupedOptions.sort((a,b)=>a.sequence-b.sequence);});}}
+const triggerSelectionField=__exports.triggerSelectionField={...selectionField,component:TriggerSelectionField,fieldDependencies:[{name:"model_is_mail_thread",type:"boolean"}],};registry.category("fields").add("base_automation_trigger_selection",triggerSelectionField);return __exports;});;
+
+/* /base_automation/static/src/kanban_header_patch.js */
+odoo.define('@base_automation/kanban_header_patch',['@web/core/l10n/translation','@web/core/registry','@web/core/utils/hooks','@web/core/utils/patch','@web/views/kanban/kanban_header','@base_automation/utils'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{patch}=require("@web/core/utils/patch");const{KanbanHeader}=require("@web/views/kanban/kanban_header");const{TRIGGER_FILTERS}=require("@base_automation/utils");const SUPPORTED_TRIGGERS=["on_stage_set","on_tag_set","on_state_set","on_priority_set","on_user_set","on_archive",];function enrichContext(context,group){const{displayName,groupByField,value}=group;const{name,relation,type:ttype}=groupByField;for(const trigger of SUPPORTED_TRIGGERS){if(!TRIGGER_FILTERS[trigger]({name,relation,ttype})){continue;}
+switch(trigger){case"on_stage_set":return{...context,default_trigger:trigger,default_name:_t('Stage is set to "%s"',displayName),default_trg_field_ref:value,};case"on_tag_set":return{...context,default_trigger:trigger,default_name:_t('"%s" tag is added',displayName),default_trg_field_ref:value,};default:return{...context,default_trigger:trigger};}}
+return{...context,default_trigger:"on_create_or_write"};}
+patch(KanbanHeader.prototype,{setup(){super.setup();this.action=useService("action");this.user=useService("user");},get permissions(){const permissions=super.permissions;Object.defineProperty(permissions,"canEditAutomations",{get:()=>this.user.isAdmin,configurable:true,});return permissions;},async openAutomations(){return this._openAutomations();},async _openAutomations(){const domain=[["model","=",this.props.list.resModel]];const modelId=await this.orm.search("ir.model",domain,{limit:1});const context={active_test:false,default_model_id:modelId[0],search_default_model_id:modelId[0],};this.action.doAction("base_automation.base_automation_act",{additionalContext:enrichContext(context,this.group),});},});registry.category("kanban_header_config_items").add("open_automations",{label:_t("Automations"),method:"openAutomations",isVisible:({permissions})=>permissions.canEditAutomations,class:"o_column_automations",},{sequence:25,force:true});return __exports;});;
+
+/* /base_automation/static/src/utils.js */
+odoo.define('@base_automation/utils',[],function(require){'use strict';let __exports={};const TRIGGER_FILTERS=__exports.TRIGGER_FILTERS={on_create_or_write:(f)=>true,on_create:(f)=>true,on_write:(f)=>true,on_change:(f)=>true,on_unlink:(f)=>true,on_time:(f)=>true,on_time_created:(f)=>f.ttype==="datetime"&&f.name==="create_date",on_time_updated:(f)=>f.ttype==="datetime"&&f.name==="write_date",on_stage_set:(f)=>f.ttype==="many2one"&&["stage_id","x_studio_stage_id"].includes(f.name),on_user_set:(f)=>f.relation==="res.users"&&["many2one","many2many"].includes(f.ttype)&&["user_id","user_ids","x_studio_user_id","x_studio_user_ids"].includes(f.name),on_tag_set:(f)=>f.ttype==="many2many"&&["tag_ids","x_studio_tag_ids"].includes(f.name),on_state_set:(f)=>f.ttype==="selection"&&["state","x_studio_state"].includes(f.name),on_priority_set:(f)=>f.ttype==="selection"&&["priority","x_studio_priority"].includes(f.name),on_archive:(f)=>f.ttype==="boolean"&&["active","x_active"].includes(f.name),on_unarchive:(f)=>f.ttype==="boolean"&&["active","x_active"].includes(f.name),on_webhook:(f)=>true,};return __exports;});;
+
 /* /base_import/static/src/import_action/import_action.js */
 odoo.define('@base_import/import_action/import_action',['@web/core/l10n/translation','@odoo/owl','@web/core/registry','@web/core/utils/hooks','@web/core/file_input/file_input','@base_import/import_model','@base_import/import_data_content/import_data_content','@base_import/import_data_progress/import_data_progress','@base_import/import_data_sidepanel/import_data_sidepanel','@web/search/layout'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{Component,onWillStart,onMounted,useState}=require("@odoo/owl");const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{FileInput}=require("@web/core/file_input/file_input");const{useImportModel}=require("@base_import/import_model");const{ImportDataContent}=require("@base_import/import_data_content/import_data_content");const{ImportDataProgress}=require("@base_import/import_data_progress/import_data_progress");const{ImportDataSidepanel}=require("@base_import/import_data_sidepanel/import_data_sidepanel");const{Layout}=require("@web/search/layout");const ImportAction=__exports.ImportAction=class ImportAction extends Component{static template="ImportAction";static nextId=1;static components={FileInput,ImportDataContent,ImportDataSidepanel,Layout,};setup(){this.notification=useService("notification");this.orm=useService("orm");this.router=useService("router");this.user=useService("user");this.env.config.setDisplayName(this.props.action.name||_t("Import a File"));this.resModel=this.props.action.params.model;this.model=useImportModel({env:this.env,resModel:this.resModel,context:this.props.action.params.context||{},orm:this.orm,});this.state=useState({filename:undefined,fileLength:0,importMessages:[],importProgress:{value:0,step:1,},isPaused:false,previewError:"",});onWillStart(()=>this.model.init());onMounted(()=>this.enter());}
 enter(){const newState={action:"import",model:this.resModel};this.router.pushState(newState,{replace:true});}
@@ -16611,29 +16724,6 @@ return __exports;});;
 /* /hr_org_chart/static/src/views/hr_employee_hierarchy/hr_employee_hierarchy_view.js */
 odoo.define('@hr_org_chart/views/hr_employee_hierarchy/hr_employee_hierarchy_view',['@web/core/registry','@web_hierarchy/hierarchy_view','@hr_org_chart/views/hr_employee_hierarchy/hr_employee_hierarchy_renderer'],function(require){'use strict';let __exports={};const{registry}=require("@web/core/registry");const{hierarchyView}=require("@web_hierarchy/hierarchy_view");const{HrEmployeeHierarchyRenderer}=require("@hr_org_chart/views/hr_employee_hierarchy/hr_employee_hierarchy_renderer");const hrEmployeeHierarchyView=__exports.hrEmployeeHierarchyView={...hierarchyView,Renderer:HrEmployeeHierarchyRenderer,};registry.category("views").add("hr_employee_hierarchy",hrEmployeeHierarchyView);return __exports;});;
 
-/* /iap/static/src/action_buttons_widget/action_buttons_widget.js */
-odoo.define('@iap/action_buttons_widget/action_buttons_widget',['@web/core/registry','@web/core/utils/hooks','@web/views/widgets/standard_widget_props','@odoo/owl'],function(require){'use strict';let __exports={};const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{standardWidgetProps}=require("@web/views/widgets/standard_widget_props");const{Component}=require("@odoo/owl");class IAPActionButtonsWidget extends Component{setup(){this.orm=useService("orm");this.action=useService("action");}
-async onViewServicesClicked(){this.action.doAction("iap.iap_account_action");}
-async onBuyLinkClicked(){const url=await this.orm.silent.call("iap.account","get_credits_url",[this.props.serviceName]);this.action.doAction({type:"ir.actions.act_url",url:url,});}}
-IAPActionButtonsWidget.template="iap.ActionButtonsWidget";IAPActionButtonsWidget.props={...standardWidgetProps,serviceName:String,showServiceButtons:Boolean,};const iapActionButtonsWidget=__exports.iapActionButtonsWidget={component:IAPActionButtonsWidget,extractProps:({attrs})=>{return{serviceName:attrs.service_name,showServiceButtons:!Boolean(attrs.hide_service),};},};registry.category("view_widgets").add("iap_buy_more_credits",iapActionButtonsWidget);return __exports;});;
-
-/* /iap/static/src/js/insufficient_credit_error_handler.js */
-odoo.define('@iap/js/insufficient_credit_error_handler',['@web/core/dialog/dialog','@web/core/registry','@web/core/utils/hooks','@web/core/l10n/translation','@odoo/owl'],function(require){'use strict';let __exports={};const{Dialog}=require("@web/core/dialog/dialog");const{registry}=require("@web/core/registry");const{useService}=require("@web/core/utils/hooks");const{_t}=require("@web/core/l10n/translation");const{Component,onWillStart}=require("@odoo/owl");class InsufficientCreditDialog extends Component{setup(){this.orm=useService("orm");onWillStart(this.onWillStart);}
-async onWillStart(){const{errorData}=this.props;this.url=await this.orm.call("iap.account","get_credits_url",[],{base_url:errorData.base_url,service_name:errorData.service_name,credit:errorData.credit,trial:errorData.trial,});this.style=errorData.body?"padding:0;":"";const{isEnterprise}=odoo.info;if(errorData.trial&&isEnterprise){this.buttonMessage=_t("Start a Trial at Odoo");}else{this.buttonMessage=_t("Buy credits");}}
-buyCredits(){window.open(this.url,"_blank");this.props.close();}}
-InsufficientCreditDialog.components={Dialog};InsufficientCreditDialog.template="iap.InsufficientCreditDialog";function insufficientCreditHandler(env,error,originalError){if(!originalError){return false;}
-const{data}=originalError;if(data&&data.name==="odoo.addons.iap.tools.iap_tools.InsufficientCreditError"){env.services.dialog.add(InsufficientCreditDialog,{errorData:JSON.parse(data.message),});return true;}
-return false;}
-registry.category("error_handlers").add("insufficientCreditHandler",insufficientCreditHandler,{sequence:0});return __exports;});;
-
-/* /iap_mail/static/src/js/services/iap_notification_service.js */
-odoo.define('@iap_mail/js/services/iap_notification_service',['@web/core/l10n/translation','@web/core/registry','@odoo/owl'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{registry}=require("@web/core/registry");const{markup}=require("@odoo/owl");const iapNotificationService=__exports.iapNotificationService={dependencies:["bus_service","notification"],start(env,{bus_service,notification}){bus_service.subscribe("iap_notification",(params)=>{if(params.type=="no_credit"){displayCreditErrorNotification(params);}else{displayNotification(params);}});bus_service.start();function displayNotification(params){notification.add(params.message,{title:params.title,type:params.type,});}
-function displayCreditErrorNotification(params){const translatedText=_t("Buy more credits");const message=markup(`
-            <a class='btn btn-link' href='${params.get_credits_url}' target='_blank'>
-                <i class='oi oi-arrow-right'></i>
-                ${translatedText}
-            </a>`);notification.add(message,{title:params.title,type:'danger',});}}};registry.category("services").add("iapNotification",iapNotificationService);return __exports;});;
-
 /* /partner_autocomplete/static/src/js/partner_autocomplete_component.js */
 odoo.define('@partner_autocomplete/js/partner_autocomplete_component',['@web/core/autocomplete/autocomplete'],function(require){'use strict';let __exports={};const{AutoComplete}=require("@web/core/autocomplete/autocomplete");const PartnerAutoComplete=__exports.PartnerAutoComplete=class PartnerAutoComplete extends AutoComplete{static template="partner_autocomplete.PartnerAutoComplete";setup(){super.setup();this.shouldSearchWorldwide=false;}
 loadOptions(options,request){if(typeof options==="function"){return options(request,this.shouldSearchWorldwide);}else{return options;}}
@@ -16698,52 +16788,6 @@ const partnerAutoCompleteMany2one=__exports.partnerAutoCompleteMany2one={...many
 
 /* /partner_autocomplete/static/src/js/web_company_autocomplete.js */
 odoo.define('@partner_autocomplete/js/web_company_autocomplete',['@web/core/registry','@web/session'],function(require){'use strict';let __exports={};const{registry}=require("@web/core/registry");const{session}=require("@web/session");const companyAutocompleteService=__exports.companyAutocompleteService={dependencies:["orm","company"],start(env,{orm,company}){if(session.iap_company_enrich){const currentCompanyId=company.currentCompany.id;orm.silent.call("res.company","iap_enrich_auto",[currentCompanyId],{});}},};registry.category("services").add("partner_autocomplete.companyAutocomplete",companyAutocompleteService);return __exports;});;
-
-/* /sms/static/src/components/phone_field/phone_field.js */
-odoo.define('@sms/components/phone_field/phone_field',['@web/core/l10n/translation','@web/core/utils/patch','@web/views/fields/phone/phone_field','@sms/components/sms_button/sms_button'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");const{PhoneField,phoneField,formPhoneField}=require("@web/views/fields/phone/phone_field");const{SendSMSButton}=require('@sms/components/sms_button/sms_button');patch(PhoneField,{components:{...PhoneField.components,SendSMSButton},defaultProps:{...PhoneField.defaultProps,enableButton:true,},props:{...PhoneField.props,enableButton:{type:Boolean,optional:true},},});const patchDescr=()=>({extractProps({options}){const props=super.extractProps(...arguments);props.enableButton=options.enable_sms;return props;},supportedOptions:[{label:_t("Enable SMS"),name:"enable_sms",type:"boolean",default:true,}],});patch(phoneField,patchDescr());patch(formPhoneField,patchDescr());return __exports;});;
-
-/* /sms/static/src/components/sms_button/sms_button.js */
-odoo.define('@sms/components/sms_button/sms_button',['@web/core/l10n/translation','@web/core/utils/hooks','@odoo/owl'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{useService}=require("@web/core/utils/hooks");const{Component,status}=require("@odoo/owl");const SendSMSButton=__exports.SendSMSButton=class SendSMSButton extends Component{setup(){this.action=useService("action");this.user=useService("user");this.title=_t("Send SMS Text Message");}
-get phoneHref(){return"sms:"+this.props.record.data[this.props.name].replace(/\s+/g,"");}
-async onClick(){await this.props.record.save();this.action.doAction({type:"ir.actions.act_window",target:"new",name:this.title,res_model:"sms.composer",views:[[false,"form"]],context:{...this.user.context,default_res_model:this.props.record.resModel,default_res_id:this.props.record.resId,default_number_field_name:this.props.name,default_composition_mode:"comment",},},{onClose:()=>{if(status(this)==="destroyed"){return;}
-this.props.record.load();},});}}
-SendSMSButton.template="sms.SendSMSButton";SendSMSButton.props=["*"];return __exports;});;
-
-/* /sms/static/src/components/sms_widget/fields_sms_widget.js */
-odoo.define('@sms/components/sms_widget/fields_sms_widget',['@web/core/l10n/translation','@mail/views/web/fields/emojis_text_field/emojis_text_field','@web/core/utils/hooks','@web/core/registry'],function(require){'use strict';let __exports={};const{_t}=require("@web/core/l10n/translation");const{EmojisTextField,emojisTextField,}=require("@mail/views/web/fields/emojis_text_field/emojis_text_field");const{useService}=require("@web/core/utils/hooks");const{registry}=require("@web/core/registry");const SmsWidget=__exports.SmsWidget=class SmsWidget extends EmojisTextField{setup(){super.setup();this._emojiAdded=()=>this.props.record.update({[this.props.name]:this.targetEditElement.el.value});this.notification=useService('notification');}
-get encoding(){return this._extractEncoding(this.props.record.data[this.props.name]||'');}
-get nbrChar(){const content=this._getValueForSmsCounts(this.props.record.data[this.props.name]||"");return content.length+(content.match(/\n/g)||[]).length;}
-get nbrCharExplanation(){return"";}
-get nbrSMS(){return this._countSMS(this.nbrChar,this.encoding);}
-_countSMS(nbrChar,encoding){if(nbrChar===0){return 0;}
-if(encoding==='UNICODE'){if(nbrChar<=70){return 1;}
-return Math.ceil(nbrChar/67);}
-if(nbrChar<=160){return 1;}
-return Math.ceil(nbrChar/153);}
-_extractEncoding(content){if(String(content).match(RegExp("^[@£$¥èéùìòÇ\\nØø\\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\\\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà]*$"))){return'GSM7';}
-return'UNICODE';}
-_getValueForSmsCounts(value){return value;}
-async onBlur(){var content=this.props.record.data[this.props.name]||'';if(!content.trim().length&&content.length>0){this.notification.add(_t("Your SMS Text Message must include at least one non-whitespace character"),{type:'danger'},)
-await this.props.record.update({[this.props.name]:content.trim()});}}
-async onInput(ev){super.onInput(...arguments);await this.props.record.update({[this.props.name]:this.targetEditElement.el.value});}}
-SmsWidget.template='sms.SmsWidget';const smsWidget=__exports.smsWidget={...emojisTextField,component:SmsWidget,additionalClasses:[...(emojisTextField.additionalClasses||[]),"o_field_text","o_field_text_emojis",],};registry.category("fields").add("sms_widget",smsWidget);return __exports;});;
-
-/* /sms/static/src/core/failure_model_patch.js */
-odoo.define('@sms/core/failure_model_patch',['@mail/core/common/failure_model','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Failure}=require("@mail/core/common/failure_model");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(Failure.prototype,{get iconSrc(){if(this.type==="sms"){return"/sms/static/img/sms_failure.svg";}
-return super.iconSrc;},get body(){if(this.type==="sms"){return _t("An error occurred when sending an SMS");}
-return super.body;},});return __exports;});;
-
-/* /sms/static/src/core/notification_model_patch.js */
-odoo.define('@sms/core/notification_model_patch',['@mail/core/common/notification_model','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Notification}=require("@mail/core/common/notification_model");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(Notification.prototype,{get icon(){if(this.notification_type==="sms"){return"fa fa-mobile";}
-return super.icon;},get label(){if(this.notification_type==="sms"){return _t("SMS");}
-return super.label;},});return __exports;});;
-
-/* /sms/static/src/messaging_menu/messaging_menu_patch.js */
-odoo.define('@sms/messaging_menu/messaging_menu_patch',['@mail/core/web/messaging_menu','@web/core/l10n/translation','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{MessagingMenu}=require("@mail/core/web/messaging_menu");const{_t}=require("@web/core/l10n/translation");const{patch}=require("@web/core/utils/patch");patch(MessagingMenu.prototype,{openFailureView(failure){if(failure.type==="email"){return super.openFailureView(failure);}
-this.env.services.action.doAction({name:_t("SMS Failures"),type:"ir.actions.act_window",view_mode:"kanban,list,form",views:[[false,"kanban"],[false,"list"],[false,"form"],],target:"current",res_model:failure.resModel,domain:[["message_has_sms_error","=",true]],context:{create:false},});this.close();},});return __exports;});;
-
-/* /sms/static/src/thread/message_patch.js */
-odoo.define('@sms/thread/message_patch',['@mail/core/common/message','@web/core/utils/patch'],function(require){'use strict';let __exports={};const{Message}=require("@mail/core/common/message");const{patch}=require("@web/core/utils/patch");patch(Message.prototype,{onClickFailure(){if(this.message.type==="sms"){this.env.services.action.doAction("sms.sms_resend_action",{additionalContext:{default_mail_message_id:this.message.id,},});}else{super.onClickFailure(...arguments);}},});return __exports;});;
 
 /* /sale_product_configurator/static/src/js/badge_extra_price/badge_extra_price.js */
 odoo.define('@sale_product_configurator/js/badge_extra_price/badge_extra_price',['@odoo/owl','@web/core/currency'],function(require){'use strict';let __exports={};const{Component}=require("@odoo/owl");const{formatCurrency}=require("@web/core/currency");const BadgeExtraPrice=__exports.BadgeExtraPrice=class BadgeExtraPrice extends Component{static template="product.badge_extra_price";static props={price:Number,currencyId:Number,};getFormattedPrice(){return formatCurrency(Math.abs(this.props.price),this.props.currencyId);}}
@@ -29042,6 +29086,152 @@ return __exports;});
 </t>
 
 
+<t t-name="iap.ActionButtonsWidget">
+        <div class="row">
+            <div class="col-sm">
+                <button t-on-click="onBuyLinkClicked" class="btn btn-link buy_credits px-0 o-hidden-ios text-nowrap"><i class="oi oi-arrow-right"/> Buy credits</button><br/>
+                <button t-if="props.showServiceButtons" t-on-click="onViewServicesClicked" class="btn btn-link px-0 o-hidden-ios text-nowrap"><i class="oi oi-arrow-right"/> View My Services</button>
+            </div>
+        </div>
+    </t>
+
+<t t-name="iap.InsufficientCreditDialog">
+        <Dialog>
+            <div t-att-style="style">
+                <t t-if="props.errorData.body">
+                    <div t-raw="props.errorData.body"/>
+                </t>
+                <t t-if="!props.errorData.body">
+                    <t t-if="props.errorData.message">
+                        <span t-esc="props.errorData.message"/>
+                    </t>
+                    <t t-if="!props.errorData.message">
+                        <span>Insufficient credit to perform this service.</span>
+                    </t>
+                </t>
+                <t t-set-slot="footer">
+                    <button class="btn btn-primary" t-on-click="buyCredits" t-esc="buttonMessage"/>
+                    <button class="btn" t-on-click="close">Cancel</button>
+                </t>
+            </div>
+        </Dialog>
+    </t>
+<t t-name="sms.SendSMSButton">
+        <a t-att-title="title" t-att-href="phoneHref" t-on-click.prevent.stop="onClick" class="ms-3 d-inline-flex align-items-center o_field_phone_sms"><i class="fa fa-mobile"/><small class="fw-bold ms-1">SMS</small></a>
+    </t>
+
+<t t-name="sms.SmsWidget">
+        <t t-if="props.readonly">
+            <span t-esc="props.record.data[props.name] or ''" t-ref="targetReadonlyElement"/>
+        </t>
+        <t t-else="">
+            <div t-ref="div">
+                <textarea class="o_input" t-att-class="{'o_field_translate': isTranslatable}" t-att-id="props.id" t-att-placeholder="props.placeholder" t-att-rows="rowCount" t-ref="textarea" t-on-blur="onBlur"/>
+            <t t-call="mail.EmojisFieldButton"/>
+                <t t-if="isTranslatable">
+                    <TranslationButton fieldName="props.name" record="props.record"/>
+                </t>
+            </div>
+        </t>
+            <div class="o_sms_container">
+                <span class="text-muted o_sms_count">
+                    <t t-out="nbrChar"/> characters<t t-out="nbrCharExplanation"/>, fits in <t t-out="nbrSMS"/> SMS (<t t-out="encoding"/>)
+                    <a href="https://iap-services.odoo.com/iap/sms/pricing" target="_blank" title="SMS Pricing" aria-label="SMS Pricing" class="fa fa-lg fa-info-circle"/>
+                </span>
+            </div>
+    </t>
+
+<t t-name="base_automation.ActionsOne2ManyField">
+        <div class="d-flex align-items-center" t-ref="root">
+            <t t-if="currentActions.length === 0">
+                <span class="text-muted">no action defined...</span>
+            </t>
+            <t t-foreach="currentActions" t-as="action" t-key="action.id">
+                <div style="min-width: fit-content;" t-att-data-action-id="action.id">
+                    <div class="fs-5 d-flex align-items-center">
+                        <i data-name="server_action_icon" t-att-title="getActionType(action)" class="fa" t-att-class="{                                 'code': 'fa-file-code-o',                                 'object_create': 'fa-edit',                                 'object_write': 'fa-refresh',                                 'multi': 'fa-list-ul',                                 'mail_post': 'fa-envelope',                                 'followers': 'fa-user-o',                                 'remove_followers': 'fa-user-times',                                 'next_activity': 'fa-clock-o',                                 'sms': 'fa-comments-o',                             }[action.data.state]"/>
+                        <div class="ps-2" t-esc="action.data.name"/>
+                    </div>
+                </div>
+                <div t-if="!action_last" class="px-3 align-self-center" t-att-data-action-id="action.id">
+                    <i class="fa fa-lg fa-plus text-primary"/>
+                </div>
+            </t>
+            <t t-if="hiddenActionsCount">
+                <div class="fs-3 align-self-center text-muted">
+                    <t t-out="moreText"/>
+                </div>
+            </t>
+        </div>
+    </t>
+<t t-name="base_automation.ErrorDialog">
+      <Dialog title="this.constructor.title" size="'md'" contentClass="'o_error_dialog'">
+         <div role="alert">
+          <p class="text-prewrap">
+            <p><b>An error occurred</b></p>
+            <p>Please use the copy button to report the error to your support service.</p>
+          </p>
+
+          <button class="btn btn-link" t-on-click="() =&gt; { state.showTraceback = !state.showTraceback }">See details</button>
+            <t t-if="isUserAdmin">
+                <button class="btn btn-secondary mt4 o_disable_action_button me-3" t-on-click.prevent="disableAutomation">
+                    <i class="fa fa-ban mr8"/>Disable Automation Rule
+                </button>
+                <button class="btn btn-secondary mt4 o_edit_action_button" t-on-click.prevent="editAutomation">
+                    <i class="fa fa-edit mr8"/>Edit Automation Rule
+                </button>
+            </t>
+          <div t-if="state.showTraceback and (props.name or props.message)" class="alert alert-info bg-100 clearfix" role="alert">
+            <code t-if="props.name" t-esc="props.name"/>
+            <p t-if="props.message" t-esc="props.message"/>
+          </div>
+          <div t-if="state.showTraceback" class="alert alert-danger o_error_detail" role="alert">
+              <pre t-esc="traceback or props.traceback"/>
+          </div>
+            <p>
+                The error occurred during the execution of the automation rule
+                "<t t-esc="automationName"/>"
+                (ID: <t t-esc="automationId"/>).
+                <br/>
+            </p>
+            <p t-if="isUserAdmin">
+                You can disable this automation rule or edit it to solve the issue.<br/>
+                Disabling this automation rule will enable you to continue your workflow
+                but any data created after this could potentially be corrupted,
+                as you are effectively disabling a customization that may set
+                important and/or required fields.
+            </p>
+            <p t-else="">
+                You can ask an administrator to disable or correct this automation rule.
+            </p>
+        </div>
+        <t t-set-slot="footer">
+          <button class="btn btn-primary o-default-button" t-on-click="props.close">Close</button>
+          <button class="btn btn-secondary" t-on-click="onClickClipboard">
+            <i class="fa fa-clipboard mr8"/><t>Copy error to clipboard</t>
+          </button>
+        </t>
+      </Dialog>
+    </t>
+
+<t t-name="base_automation.TriggerSelectionField">
+        <t t-if="props.readonly">
+            <span t-esc="string" t-att-raw-value="value"/>
+        </t>
+        <t t-else="">
+            <select class="o_input pe-3" t-on-change="onChange" t-on-click.stop="() =&gt; {}" t-att-id="props.id">
+                <option t-att-selected="false === value" t-att-value="stringify(false)" t-esc="this.props.placeholder || ''" t-attf-style="{{ props.required ? 'display:none' : '' }}"/>
+                <t t-foreach="groupedOptions" t-as="group" t-key="group.key">
+                <optgroup t-att-label="group.name">
+                    <t t-foreach="group.options" t-as="option" t-key="option.value">
+                        <option t-att-selected="option.value === value" t-att-value="stringify(option.value)" t-esc="option.label"/>
+                    </t>
+                </optgroup>
+            </t>
+        </select>
+        </t>
+    </t>
+
 <t t-name="ImportAction">
         <div class="h-100 d-flex flex-column">
             <Layout className="'o_import_action d-flex h-100 overflow-auto'" display="display">
@@ -29627,36 +29817,6 @@ return __exports;});
         </div>
     </t>
 
-<t t-name="iap.ActionButtonsWidget">
-        <div class="row">
-            <div class="col-sm">
-                <button t-on-click="onBuyLinkClicked" class="btn btn-link buy_credits px-0 o-hidden-ios text-nowrap"><i class="oi oi-arrow-right"/> Buy credits</button><br/>
-                <button t-if="props.showServiceButtons" t-on-click="onViewServicesClicked" class="btn btn-link px-0 o-hidden-ios text-nowrap"><i class="oi oi-arrow-right"/> View My Services</button>
-            </div>
-        </div>
-    </t>
-
-<t t-name="iap.InsufficientCreditDialog">
-        <Dialog>
-            <div t-att-style="style">
-                <t t-if="props.errorData.body">
-                    <div t-raw="props.errorData.body"/>
-                </t>
-                <t t-if="!props.errorData.body">
-                    <t t-if="props.errorData.message">
-                        <span t-esc="props.errorData.message"/>
-                    </t>
-                    <t t-if="!props.errorData.message">
-                        <span>Insufficient credit to perform this service.</span>
-                    </t>
-                </t>
-                <t t-set-slot="footer">
-                    <button class="btn btn-primary" t-on-click="buyCredits" t-esc="buttonMessage"/>
-                    <button class="btn" t-on-click="close">Cancel</button>
-                </t>
-            </div>
-        </Dialog>
-    </t>
 <t t-name="partner_autocomplete.PartnerAutoComplete">
         <div class="o-autocomplete" t-ref="root" t-att-class="autoCompleteRootClass">
             <input type="text" t-att-id="props.id" class="o-autocomplete--input o_input" autocomplete="off" t-att-placeholder="props.placeholder" role="combobox" t-att-aria-activedescendant="activeSourceOptionId" t-att-aria-expanded="displayOptions ? 'true' : 'false'" aria-autocomplete="list" aria-haspopup="listbox" t-model="state.value" t-on-blur="onInputBlur" t-on-click="onInputClick" t-on-change="onInputChange" t-on-input="onInput" t-on-keydown="onInputKeydown" t-on-focus="onInputFocus" t-ref="input"/>
@@ -29740,31 +29900,6 @@ return __exports;});
             <a class="btn btn-link" t-att-href="account_url"><i class="oi oi-arrow-right"/> Set Your Account Token</a>
         </div>
     </t>
-<t t-name="sms.SendSMSButton">
-        <a t-att-title="title" t-att-href="phoneHref" t-on-click.prevent.stop="onClick" class="ms-3 d-inline-flex align-items-center o_field_phone_sms"><i class="fa fa-mobile"/><small class="fw-bold ms-1">SMS</small></a>
-    </t>
-
-<t t-name="sms.SmsWidget">
-        <t t-if="props.readonly">
-            <span t-esc="props.record.data[props.name] or ''" t-ref="targetReadonlyElement"/>
-        </t>
-        <t t-else="">
-            <div t-ref="div">
-                <textarea class="o_input" t-att-class="{'o_field_translate': isTranslatable}" t-att-id="props.id" t-att-placeholder="props.placeholder" t-att-rows="rowCount" t-ref="textarea" t-on-blur="onBlur"/>
-            <t t-call="mail.EmojisFieldButton"/>
-                <t t-if="isTranslatable">
-                    <TranslationButton fieldName="props.name" record="props.record"/>
-                </t>
-            </div>
-        </t>
-            <div class="o_sms_container">
-                <span class="text-muted o_sms_count">
-                    <t t-out="nbrChar"/> characters<t t-out="nbrCharExplanation"/>, fits in <t t-out="nbrSMS"/> SMS (<t t-out="encoding"/>)
-                    <a href="https://iap-services.odoo.com/iap/sms/pricing" target="_blank" title="SMS Pricing" aria-label="SMS Pricing" class="fa fa-lg fa-info-circle"/>
-                </span>
-            </div>
-    </t>
-
 <t t-name="product.badge_extra_price">
         <span class="badge ms-1 ps-1 text-bg-info rounded-pill">
             <span t-out="this.props.price &gt; 0 ? '+' : '-'" class="me-1"/>

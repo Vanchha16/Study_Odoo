@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Odoo 17",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "D:\\RMA_Work\\Odoo_study\\odoo\\odoo-bin",
+            "args": [
+                "-c", "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf"
+            ],
+            "console": "integratedTerminal",
+            "python": "D:\\RMA_Work\\Odoo_study\\venv\\Scripts\\python.exe",
+            "justMyCode": false
+        },
+        {
+            "name": "Odoo 17 - Update Module",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "D:\\RMA_Work\\Odoo_study\\odoo\\odoo-bin",
+            "args": [
+                "-c", "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf",
+                "-d", "odoo",
+                "-u", "om_hospital",
+                "--dev=all"
+            ],
+            "console": "integratedTerminal",
+            "python": "D:\\RMA_Work\\Odoo_study\\venv\\Scripts\\python.exe",
+            "justMyCode": false
+        }
+    ]
+}
