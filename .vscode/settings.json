@@ -3,13 +3,11 @@
     "python.analysis.extraPaths": [
         "D:\\RMA_Work\\Odoo_study\\odoo"
     ],
-    
     "odoo.addons": [
         "D:\\RMA_Work\\Odoo_study\\odoo\\addons",
         "D:\\RMA_Work\\Odoo_study\\odoo\\odoo\\addons",
         "D:\\RMA_Work\\Odoo_study\\odoo\\Customize_sale_addons"
     ],
-    
     "python.analysis.typeCheckingMode": "basic",
     "xml.validation.enabled": false,
     "files.autoSave": "afterDelay",
@@ -24,5 +22,6 @@
     "editor.suggest.showFields": true,
     "editor.suggest.showClasses": true,
     "editor.acceptSuggestionOnEnter": "on",
-    "odoo.diagnostics": false
+    "odoo.diagnostics": false,
+    "python.languageServer": "None"
 }

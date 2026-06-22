@@ -7,22 +7,27 @@
             "request": "launch",
             "program": "D:\\RMA_Work\\Odoo_study\\odoo\\odoo-bin",
             "args": [
-                "-c", "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf"
+                "-c",
+                "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf",
+                "--dev=xml"
             ],
             "console": "integratedTerminal",
             "python": "D:\\RMA_Work\\Odoo_study\\venv\\Scripts\\python.exe",
             "justMyCode": false
         },
         {
-            "name": "Odoo 17 - Update Module",
+            "name": "Odoo 17 - Update RMA Car MGM",
             "type": "debugpy",
             "request": "launch",
             "program": "D:\\RMA_Work\\Odoo_study\\odoo\\odoo-bin",
             "args": [
-                "-c", "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf",
-                "-d", "odoo",
-                "-u", "om_hospital",
-                "--dev=all"
+                "-c",
+                "D:\\RMA_Work\\Odoo_study\\odoo\\odoo.conf",
+                "-d",
+                "odoo",
+                "-u",
+                "RMA_Car_MGM",
+                "--dev=xml"
             ],
             "console": "integratedTerminal",
             "python": "D:\\RMA_Work\\Odoo_study\\venv\\Scripts\\python.exe",
