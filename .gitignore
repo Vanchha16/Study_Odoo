@@ -1,0 +1,14 @@
+# Ignore Odoo core — not your code
+odoo/odoo/
+odoo/addons/
+
+# Ignore runtime data
+data/
+venv/
+*.pyc
+__pycache__/
+.idea/
+*.log
+
+!odoo/customize_sale_addons/
+!odoo/customize_sale_addons/**
