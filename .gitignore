@@ -1,8 +1,7 @@
-# Ignore Odoo core — not your code
+
 odoo/odoo/
 odoo/addons/
 
-# Ignore runtime data
 data/
 venv/
 *.pyc
